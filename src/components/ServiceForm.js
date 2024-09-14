@@ -1,4 +1,6 @@
 import React, { useState } from 'react';
+import { addDoc, collection } from 'firebase/firestore';
+import { db } from '../config/firebase';  // Importamos Firestore
 
 function ServiceForm({ onSave, onCancel, initialData }) {
   const [formData, setFormData] = useState(initialData || {
@@ -23,9 +25,24 @@ function ServiceForm({ onSave, onCancel, initialData }) {
     setFormData({ ...formData, choferes: [...formData.choferes, ''] });
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    onSave(formData); // Guardamos los datos del formulario
+
+    try {
+      // Guardar en Firestore
+      const newService = {
+        ...formData,
+        moviles: formData.moviles.map((movil) => movil.trim()),
+        choferes: formData.choferes.map((chofer) => chofer.trim()),
+        date: new Date(),  // Añadimos la fecha actual
+      };
+
+      await addDoc(collection(db, 'services'), newService);
+
+      onSave(newService); // Llamamos a onSave una vez que los datos se guardan en Firestore
+    } catch (error) {
+      console.error('Error al guardar el servicio en Firestore:', error);
+    }
   };
 
   return (

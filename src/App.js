@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import './App.css';
 import Slider from 'react-slick';
 import "slick-carousel/slick/slick.css"; 
@@ -7,6 +7,8 @@ import ServiceForm from './components/ServiceForm';
 import jsPDF from 'jspdf';
 import 'jspdf-autotable';
 import Modal from 'react-modal';
+import { collection, getDocs, addDoc, updateDoc, doc } from 'firebase/firestore';
+import { db } from './config/firebase';
 
 const EDITOR_PASSWORD = "tu_contraseña"; 
 const MONTHS = ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"];
@@ -15,10 +17,7 @@ Modal.setAppElement('#root');
 
 function App() {
   const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth());
-  const [services, setServices] = useState(() => {
-    const storedServices = localStorage.getItem(`services_${selectedMonth}`);
-    return storedServices ? JSON.parse(storedServices) : Array(31).fill([]);
-  });
+  const [services, setServices] = useState(Array(31).fill([]));
   const [showForm, setShowForm] = useState(false);
   const [currentDay, setCurrentDay] = useState(null);
   const [editingService, setEditingService] = useState(null);
@@ -29,17 +28,27 @@ function App() {
   const [modalIsOpen, setModalIsOpen] = useState(false); 
   const [reportType, setReportType] = useState('mensual'); // Tipo de reporte
 
-  // Referencia para el carrusel
   const sliderRef = useRef(null);
 
-  useEffect(() => {
-    const storedServices = localStorage.getItem(`services_${selectedMonth}`);
-    setServices(storedServices ? JSON.parse(storedServices) : Array(31).fill([]));
+  // Obtener servicios desde Firestore
+  const fetchServices = useCallback(async () => {
+    try {
+      const servicesCollection = collection(db, `services_${selectedMonth}`);
+      const servicesSnapshot = await getDocs(servicesCollection);
+      const servicesData = servicesSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      
+      const updatedServices = Array(31).fill([]).map((_, dayIndex) => {
+        return servicesData.filter(service => new Date(service.date.seconds * 1000).getDate() === dayIndex + 1);
+      });
+      setServices(updatedServices);
+    } catch (error) {
+      console.error("Error al obtener los servicios:", error);
+    }
   }, [selectedMonth]);
 
   useEffect(() => {
-    localStorage.setItem(`services_${selectedMonth}`, JSON.stringify(services));
-  }, [services, selectedMonth]);
+    fetchServices();
+  }, [selectedMonth, fetchServices]);
 
   // Obtener el nombre del día de la semana (Lunes, Martes, etc.) junto con el número del día
   const getWeekday = (day, month, year) => {
@@ -61,41 +70,26 @@ function App() {
     )
   );
 
-  // Generar PDF basado en el tipo de reporte (semanal, mensual, anual)
-  const handleGeneratePDF = () => {
-    const doc = new jsPDF();
-    doc.text(`Reporte ${reportType}`, 14, 16);
-
-    let filteredServicesForReport = services.flatMap((dayServices, dayIndex) =>
-      dayServices.map((service) => ({
-        day: dayIndex + 1,
-        client: service.client,
-        type: service.type,
-        moviles: service.moviles.join(', '),
-        choferes: service.choferes.join(', '),
-        origin: service.origin,
-        destination: service.destination,
-        schedule: service.schedule,
-        comments: service.comments || ''
-      }))
-    );
-
-    doc.autoTable({
-      head: [['Día', 'Cliente', 'Tipo', 'Móviles', 'Choferes', 'Origen', 'Destino', 'Horario', 'Comentarios']],
-      body: filteredServicesForReport.map(service => [
-        service.day,
-        service.client,
-        service.type,
-        service.moviles,
-        service.choferes,
-        service.origin,
-        service.destination,
-        service.schedule,
-        service.comments,
-      ]),
-    });
-
-    doc.save(`reporte-${reportType}.pdf`);
+  // Guardar servicio en Firestore
+  const handleSaveService = async (serviceDetails) => {
+    const updatedServices = [...services];
+    try {
+      if (editingService) {
+        const { dayIndex, serviceIndex } = editingService;
+        const serviceDocRef = doc(db, `services_${selectedMonth}`, updatedServices[dayIndex][serviceIndex].id);
+        await updateDoc(serviceDocRef, serviceDetails);
+        updatedServices[dayIndex][serviceIndex] = serviceDetails;
+      } else {
+        const newService = { ...serviceDetails, date: new Date() };
+        const docRef = await addDoc(collection(db, `services_${selectedMonth}`), newService);
+        updatedServices[currentDay] = [...updatedServices[currentDay], { ...newService, id: docRef.id }];
+      }
+      setServices(updatedServices);
+      setShowForm(false);
+      setEditingService(null);
+    } catch (error) {
+      console.error("Error al guardar el servicio:", error);
+    }
   };
 
   // Autenticación de usuario
@@ -132,20 +126,6 @@ function App() {
     }
   };
 
-  // Guardar servicio
-  const handleSaveService = (serviceDetails) => {
-    const updatedServices = [...services];
-    if (editingService) {
-      const { dayIndex, serviceIndex } = editingService;
-      updatedServices[dayIndex][serviceIndex] = serviceDetails;
-    } else {
-      updatedServices[currentDay] = [...updatedServices[currentDay], { ...serviceDetails, isCompleted: false }];
-    }
-    setServices(updatedServices);
-    setShowForm(false);
-    setEditingService(null);
-  };
-
   // Cancelar edición/agregar servicio
   const handleCancel = () => {
     setShowForm(false);
@@ -169,6 +149,33 @@ function App() {
   const closeModal = () => {
     setModalIsOpen(false);
     setSelectedService(null);
+  };
+
+  // Generar PDF basado en el tipo de reporte
+  const handleGeneratePDF = () => {
+    const doc = new jsPDF();
+    doc.text(`Reporte ${reportType}`, 14, 16);
+
+    let filteredServicesForReport = services.flatMap((dayServices, dayIndex) =>
+      dayServices.map(service => [
+        dayIndex + 1,
+        service.client,
+        service.type,
+        service.moviles.join(', '),
+        service.choferes.join(', '),
+        service.origin,
+        service.destination,
+        service.schedule,
+        service.comments || ''
+      ])
+    );
+
+    doc.autoTable({
+      head: [['Día', 'Cliente', 'Tipo', 'Móviles', 'Choferes', 'Origen', 'Destino', 'Horario', 'Comentarios']],
+      body: filteredServicesForReport,
+    });
+
+    doc.save(`reporte-${reportType}.pdf`);
   };
 
   // Asignar color al cuadro del servicio en función del tipo de servicio
