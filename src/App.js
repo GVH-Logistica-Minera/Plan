@@ -30,7 +30,6 @@ function App() {
 
   const sliderRef = useRef(null);
 
-  // Obtener servicios desde Firestore
   const fetchServices = useCallback(async () => {
     try {
       const servicesCollection = collection(db, `services_${selectedMonth}`);
@@ -50,19 +49,16 @@ function App() {
     fetchServices();
   }, [selectedMonth, fetchServices]);
 
-  // Obtener el nombre del día de la semana (Lunes, Martes, etc.) junto con el número del día
   const getWeekday = (day, month, year) => {
     const weekdays = ["Domingo", "Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado"];
     const date = new Date(year, month, day);
     return `${weekdays[date.getDay()]} ${day}`;
   };
 
-  // Obtener el número de días en el mes seleccionado
   const getDaysInMonth = (month, year) => {
     return new Date(year, month + 1, 0).getDate();
   };
 
-  // Filtrar servicios por búsqueda
   const filteredServices = services.map(dayServices =>
     dayServices.filter(service =>
       service.client.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -70,7 +66,6 @@ function App() {
     )
   );
 
-  // Guardar servicio en Firestore
   const handleSaveService = async (serviceDetails) => {
     const updatedServices = [...services];
     try {
@@ -92,7 +87,6 @@ function App() {
     }
   };
 
-  // Autenticación de usuario
   const handleLogin = (e) => {
     e.preventDefault();
     if (password === EDITOR_PASSWORD) {
@@ -104,7 +98,6 @@ function App() {
     setPassword('');
   };
 
-  // Agregar servicio
   const handleAddService = (dayIndex) => {
     if (isAuthenticated) {
       setCurrentDay(dayIndex);
@@ -115,7 +108,6 @@ function App() {
     }
   };
 
-  // Editar servicio
   const handleEditService = (dayIndex, serviceIndex) => {
     if (isAuthenticated) {
       setCurrentDay(dayIndex);
@@ -126,32 +118,27 @@ function App() {
     }
   };
 
-  // Cancelar edición/agregar servicio
   const handleCancel = () => {
     setShowForm(false);
     setEditingService(null);
   };
 
-  // Marcar servicio como completado
   const toggleCompleteService = (dayIndex, serviceIndex) => {
     const updatedServices = [...services];
     updatedServices[dayIndex][serviceIndex].isCompleted = !updatedServices[dayIndex][serviceIndex].isCompleted;
     setServices(updatedServices);
   };
 
-  // Abrir modal para ver detalles del servicio
   const openModal = (service) => {
     setSelectedService(service);
     setModalIsOpen(true);
   };
 
-  // Cerrar modal
   const closeModal = () => {
     setModalIsOpen(false);
     setSelectedService(null);
   };
 
-  // Generar PDF basado en el tipo de reporte
   const handleGeneratePDF = () => {
     const doc = new jsPDF();
     doc.text(`Reporte ${reportType}`, 14, 16);
@@ -178,7 +165,6 @@ function App() {
     doc.save(`reporte-${reportType}.pdf`);
   };
 
-  // Asignar color al cuadro del servicio en función del tipo de servicio
   const getServiceColor = (type) => {
     switch (type.toLowerCase()) {
       case 'in out':
@@ -194,7 +180,6 @@ function App() {
     }
   };
 
-  // Métricas de servicios
   const totalViajes = services.flat().length;
   const viajesPendientes = services.flat().filter(service => !service.isCompleted).length;
   const clientesUnicos = [...new Set(services.flat().map(service => service.client))].length;
@@ -203,7 +188,6 @@ function App() {
     <div className="App">
       <h1>Planificación de Servicios</h1>
 
-      {/* Selector de Meses */}
       <div style={{ marginBottom: '20px' }}>
         <label>Seleccionar Mes: </label>
         <select value={selectedMonth} onChange={(e) => setSelectedMonth(Number(e.target.value))}>
@@ -215,14 +199,12 @@ function App() {
         </select>
       </div>
 
-      {/* Métricas */}
       <div className="metrics">
         <p>Total de viajes: {totalViajes}</p>
         <p>Viajes pendientes: {viajesPendientes}</p>
         <p>Clientes únicos: {clientesUnicos}</p>
       </div>
 
-      {/* Cuadro de Búsqueda */}
       <input
         type="text"
         placeholder="Buscar por cliente o chofer"
@@ -231,7 +213,6 @@ function App() {
         style={{ padding: '10px', marginBottom: '20px', width: '300px', borderRadius: '5px', border: '1px solid #ccc' }}
       />
 
-      {/* Cuadro de autenticación */}
       {!isAuthenticated && (
         <div className="login-container" style={{ marginBottom: '20px' }}>
           <form onSubmit={handleLogin}>
@@ -251,7 +232,6 @@ function App() {
         </div>
       )}
 
-      {/* Modal para ver detalles del servicio */}
       <Modal
         isOpen={modalIsOpen}
         onRequestClose={closeModal}
@@ -286,7 +266,6 @@ function App() {
         )}
       </Modal>
 
-      {/* Botón para generar PDF */}
       <div>
         <label>Generar Reporte: </label>
         <select value={reportType} onChange={(e) => setReportType(e.target.value)} style={{ marginRight: '10px' }}>
@@ -297,7 +276,6 @@ function App() {
         <button onClick={handleGeneratePDF}>Generar PDF</button>
       </div>
 
-      {/* Botones para navegar */}
       <div className="nav-buttons">
         <button onClick={() => sliderRef.current.slickPrev()}>← Anterior</button>
         <button onClick={() => sliderRef.current.slickNext()}>Siguiente →</button>

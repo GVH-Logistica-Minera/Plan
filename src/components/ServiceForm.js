@@ -1,6 +1,4 @@
 import React, { useState } from 'react';
-import { addDoc, collection } from 'firebase/firestore';
-import { db } from '../config/firebase';  // Importamos Firestore
 
 function ServiceForm({ onSave, onCancel, initialData }) {
   const [formData, setFormData] = useState(initialData || {
@@ -15,34 +13,17 @@ function ServiceForm({ onSave, onCancel, initialData }) {
     isCompleted: false,
   });
 
-  // Función para agregar un móvil adicional
   const addMovil = () => {
     setFormData({ ...formData, moviles: [...formData.moviles, ''] });
   };
 
-  // Función para agregar un chofer adicional
   const addChofer = () => {
     setFormData({ ...formData, choferes: [...formData.choferes, ''] });
   };
 
-  const handleSubmit = async (e) => {
+  const handleSubmit = (e) => {
     e.preventDefault();
-
-    try {
-      // Guardar en Firestore
-      const newService = {
-        ...formData,
-        moviles: formData.moviles.map((movil) => movil.trim()),
-        choferes: formData.choferes.map((chofer) => chofer.trim()),
-        date: new Date(),  // Añadimos la fecha actual
-      };
-
-      await addDoc(collection(db, 'services'), newService);
-
-      onSave(newService); // Llamamos a onSave una vez que los datos se guardan en Firestore
-    } catch (error) {
-      console.error('Error al guardar el servicio en Firestore:', error);
-    }
+    onSave(formData);
   };
 
   return (
@@ -66,7 +47,6 @@ function ServiceForm({ onSave, onCancel, initialData }) {
         />
       </div>
 
-      {/* Sección de Móviles */}
       <div>
         <label>Móviles:</label>
         {formData.moviles.map((movil, index) => (
@@ -86,7 +66,6 @@ function ServiceForm({ onSave, onCancel, initialData }) {
         <button type="button" onClick={addMovil}>Añadir Móvil</button>
       </div>
 
-      {/* Sección de Choferes */}
       <div>
         <label>Choferes:</label>
         {formData.choferes.map((chofer, index) => (
@@ -106,7 +85,6 @@ function ServiceForm({ onSave, onCancel, initialData }) {
         <button type="button" onClick={addChofer}>Añadir Chofer</button>
       </div>
 
-      {/* Sección de Origen y Destino */}
       <div>
         <label>Origen:</label>
         <input
@@ -126,7 +104,6 @@ function ServiceForm({ onSave, onCancel, initialData }) {
         />
       </div>
 
-      {/* Sección de Horario */}
       <div>
         <label>Horario:</label>
         <input
@@ -137,7 +114,6 @@ function ServiceForm({ onSave, onCancel, initialData }) {
         />
       </div>
 
-      {/* Sección de Comentarios */}
       <div>
         <label>Comentarios:</label>
         <textarea
